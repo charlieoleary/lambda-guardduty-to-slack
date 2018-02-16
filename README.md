@@ -47,10 +47,18 @@ Python Dependencies:
 ### Deployment Guide
 
 
+### Resources
+
+
+### License
+
+GNU GENERAL PUBLIC LICENSE - Version 3, 29 June 2007
+
+
+
 
 [troposphere_link]: https://github.com/cloudtools/troposphere
 [cloudformation_link]: http://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/Welcome.html
 [guardduty_link]: https://aws.amazon.com/guardduty/
 [slack_webhook_link]: https://my.slack.com/services/new/incoming-webhook/
 [lambda_perms_link]: https://docs.aws.amazon.com/lambda/latest/dg/intro-permission-model.html
-
