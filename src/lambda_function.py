@@ -1,134 +1,91 @@
-#!/usr/bin/env python3.6
-from awacs import aws, sts
-from troposphere import GetAtt, Join, Parameter, Ref, Template, apigateway, awslambda, iam
-from troposphere.events import Rule, Target
-from troposphere.awslambda import Environment, Function
-from troposphere import GetAtt, Join
+import boto3
+import json
+import logging
+import os
 
-t = Template()
+from base64 import b64decode
+from urllib.request import Request, urlopen
+from urllib.error import URLError, HTTPError
 
-t.add_version("2010-09-09")
-t.add_description("GuardDuty to Slack Lambda bridge")
+SLACK_CHANNEL = os.environ['slackChannel']
+HOOK_URL = os.environ['kmsEncryptedHookUrl']
+AWS_DOC_URL = "https://docs.aws.amazon.com/console/guardduty/"
+AWS_CON_URL = "https://console.aws.amazon.com/guardduty"
 
-ParamLambdaS3SrcBucket = t.add_parameter(Parameter(
-    "LambdaS3SrcBucket",
-    Default="lambda-code",
-    Type="String",
-    Description="Name of the bucket where lambda function sources is stored"
-))
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
 
-ParamLambdaZipFilename = t.add_parameter(Parameter(
-    "LambdaZipFilename",
-    Default="cloudwatch-to-slack.zip",
-    Type="String",
-    Description="Name of the ZIP file with lambda function sources inside S3 bucket"
-))
 
-ParamSlackChannel = t.add_parameter(Parameter(
-    "ParamSlackChannel",
-    Default="lambda",
-    Type="String",
-    Description="Name of slack channel to send notifications"
-))
+def send_to_slack(severity, title, alert_type, msg_id, region):
 
-ParamSlackHookUrl = t.add_parameter(Parameter(
-    "ParamSlackHookUrl",
-    Default="https://hooks.slack.com/services/XXXXXXXX/KXXXXXXXX/XXXXXXXXXXXXX",
-    Type="String",
-    Description="Slack API hook URL"
-))
+    link_title = ''.join(e for e in alert_type if e.isalnum())
+    link_url = "%s%s" % (AWS_DOC_URL, link_title)
+    link_url_console = "%s/home?region=%s#/findings?search=id=%s" % (AWS_CON_URL, region, msg_id)
 
-GuardDutyToSlackFunction = t.add_resource(Function(
-    "GuardDutyToSlackFunction",
-    DependsOn='GuardDutyToSlackLambdaRole',
-    Code=awslambda.Code(
-        S3Bucket=Ref(ParamLambdaS3SrcBucket),
-        S3Key=Ref(ParamLambdaZipFilename)
-    ),
-    Environment=Environment(
-        Variables={
-            'slackChannel': Ref(ParamSlackChannel),
-            'kmsEncryptedHookUrl': Ref(ParamSlackHookUrl),
-        }
-    ),
-    Handler="lambda_function.lambda_handler",
-    MemorySize=128,
-    Role=GetAtt("GuardDutyToSlackLambdaRole", "Arn"),
-    Runtime="python3.6",
-    Timeout=10
-))
+    sev_high = ['danger', 'High']
+    sev_medium = ['warning', 'Medium']
+    sev_low = ['#ff970f', 'Low']
 
-GuardDutyToSlackLambdaRole = t.add_resource(iam.Role(
-    "GuardDutyToSlackLambdaRole",
-    AssumeRolePolicyDocument=aws.Policy(
-        Statement=[
-            aws.Statement(
-                Effect=aws.Allow,
-                Action=[sts.AssumeRole],
-                Principal=aws.Principal(
-                    "Service", ["lambda.amazonaws.com"]
-                )
-            )
-        ]
-    ),
-    Path= "/service-role/",
-    ManagedPolicyArns=[
-        'arn:aws:iam::aws:policy/AWSXrayWriteOnlyAccess',
-        'arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole',
-        'arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole'
-        ],
-    Policies=[
-        iam.Policy(
-            PolicyName="LambdaPolicy",
-            PolicyDocument=aws.Policy(
-                Statement=[
-                    aws.Statement(
-                        Effect=aws.Allow,
-                        Action=[
-                            aws.Action("logs", "CreateLogGroup"),
-                            aws.Action("logs", "CreateLogStream"),
-                            aws.Action("logs", "PutLogEvents"),
-                        ],
-                        Resource=["arn:aws:logs:*:*:*"]
-                    )
-                ]
-            )
-        )
-    ]
-))
+    sinfo = ( (0.1<=severity<3.9) and sev_low ) or \
+            ( (4.0<=severity<6.9) and sev_medium ) or \
+            ( (7.0<=severity<8.9) and sev_high )
 
-# Create the Event Target
-GuardDutyEventTarget = Target(
-    "GuardDutyEventTarget",
-    Arn=GetAtt('GuardDutyToSlackFunction', 'Arn'),
-    Id="GuardDutyToSlackFunction"
-)
+    color = str(sinfo[0])
+    score = str(sinfo[1])
 
-# Create the Event Rule
-GuardDutyEventRule = t.add_resource(Rule(
-    "GuardDutyEventRule",
-    EventPattern={
-        "source": [
-            "aws.guardduty"
-        ],
-        "detail-type": [
-          "GuardDuty Finding"
-        ]
-    },
-    Description="GuardDuty CloudWatch Event Rule",
-    State="ENABLED",
-    Targets=[GuardDutyEventTarget]
-))
+    slack_message = {
+        "channel": SLACK_CHANNEL,
+        "username": "GuardDuty",
+        "icon_emoji": ":warning:",
+        "attachments": [{
+            "color": color,
+            "text": title,
+            "title": alert_type,
+            "title_link": link_url,
+            "fallback": title,
+            "fields": [
+                {
+                    "title": "Severity",
+                    "value": score,
+                    "short": "true"
+                }
+            ],
+            "actions": [
+                {
+                    "type": "button",
+                    "text": "Console",
+                    "url": link_url_console
+                },
+                {
+                    "type": "button",
+                    "text": "Reference",
+                    "url": link_url
+                }
+            ]
+        }]
+    }
 
-# Create invoke Permission
-APILambdaPermission = t.add_resource(awslambda.Permission(
-    "APILambdaPermission",
-    DependsOn="GuardDutyToSlackFunction",
-    Action="lambda:InvokeFunction",
-    FunctionName=GetAtt('GuardDutyToSlackFunction', 'Arn'),
-    Principal="events.amazonaws.com",
-    SourceArn=GetAtt('GuardDutyEventRule', 'Arn')
-))
+    req = Request(HOOK_URL, json.dumps(slack_message).encode('utf-8'))
+    try:
+        response = urlopen(req)
+        response.read()
+        logger.info("Message posted to %s", slack_message['channel'])
+    except HTTPError as e:
+        logger.error("Request failed: %d %s", e.code, e.reason)
+    except URLError as e:
+        logger.error("Server connection failed: %s", e.reason)
 
-print t.to_json()
+
+def lambda_handler(event, context):
+
+    timestamp = event['time']
+    title = event['detail']['title']
+    severity = event['detail']['severity']
+    alert_type = event['detail']['type']
+    msg_id = event['detail']['id']
+    region = event['region']
+
+    send_to_slack(severity, title, alert_type, msg_id, region)
+
+    return str(event)
 

@@ -33,7 +33,7 @@ ParamSlackChannel = t.add_parameter(Parameter(
 
 ParamSlackHookUrl = t.add_parameter(Parameter(
     "ParamSlackHookUrl",
-    Default="https://hooks.slack.com/services/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",
+    Default="https://hooks.slack.com/services/xxxxxxxx/xxxxxxxx/xxxxxxxxxx",
     Type="String",
     Description="Slack API hook URL"
 ))
@@ -131,7 +131,6 @@ APILambdaPermission = t.add_resource(awslambda.Permission(
     Principal="events.amazonaws.com",
     SourceArn=GetAtt('GuardDutyEventRule', 'Arn')
 ))
-
 
 print t.to_json()
 
