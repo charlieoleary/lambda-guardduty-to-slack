@@ -1,64 +1,47 @@
-# lambda-guardduty-to-slack
+# sls-guardduty-slack-notifications
 
-### [AWS GuardDuty][guardduty_link]
+Based on the work by [GlorifiedTypist](https://github.com/GlorifiedTypist/lambda-guardduty-to-slack), but deployed with the Serverless Framework.
+
+## [AWS GuardDuty](https://aws.amazon.com/guardduty)
 
 Flagship threat detection service for the cloud which continuously monitors and protects AWS accounts, along with the applications and services running within them.
 
- - Detects known and unknown threats (Zero-Days)
- - Makes use of artificial intelligence and machine learning from a large sample base
- - Integrated threat intelligence
- - Fire and forget
+- Detects known and unknown threats (Zero-Days)
+- Makes use of artificial intelligence and machine learning from a large sample base
+- Integrated threat intelligence
+- Fire and forget
 
-### [Troposphere][troposphere_link] & [CloudFormation][cloudformation_link]
+## [Serverless Framework](https://serverless.com)
 
- - True IaC, preview changes, rollback triggers
- - Portable, flexible and repeatable
- - Native CI/CD integration
+- Simplifed framework on top of CloudFormation
+- Enabls versioned deployments, managed secrets, etc.
 
-### Prerequisites
+## Deployment Guide
 
-**Python 3.6**
+### Configuration
 
-Python Dependencies:
+Refer to the `serverless.yml` file for all configuration options.
 
- - virtualenv
- - awacs
- - troposphere
- - requests
- - boto3
+You will need to create a Slack webhook and an appropriate SSM path for it. The following parameters
+are expected:
 
-### Infrastructure Resource Overview
+`/serverless/guardDutyNotifications/SLACK_WEBHOOK` - The webhook that will receive the POST.
+`/serverless/guardDutyNotifications/SLACK_CHANNEL` - The channel the message will be sent to.
 
-#### Not covered in the stack scripts and must be provided for a successful deployment:
+The `stage` and `region` parameters can be customized based on your use case.
 
-* **S3 Bucket** with appropriate permissions, if not IAM permissions assigned CF will assume the logged in deployment users IAM users permissions
-* **Slack Incoming Webhook** has been setup and assigned to a channel. Further info and a setup guide can be found [here][slack_webhook_link]
+### Deploying the Stack
 
-#### The stack scripts brings the following resources up during deployment:
-
-* **GuardDutyToSlackFunction** (``AWS::Lambda::Function``): approx 10Mb zip of code and dependancies.
-* **GuardDutyToSlackLambaRole** (``AWS::IAM::Role``): minimal access to required permissions:
- - (``AWSXrayWriteOnlyAccess``): gathers meta-data of various requests between compute resources in the application flow
- - (``AWSLambdaBasicExecutionRole``): grants permission to Lambda to run as well as calls from CloudWatch
- - (``AWSLambdaVPCAccessExecutionRole``): allows Lambda to write to CloudWatch logs
-* **GuardDutyEventRule** (``AWS::Events::Rule``): routes Guardduty specific event to the Lambda function for processing
-* **APILambdaPermission** (``AWS::Lambda::Permission``): allows versioning of code updates and abstracting updates from testing environments into production
-
-### Deployment Guide
-
+- Install the Serverless Framework.
+- Run `npm install` to install the `serverless-python-requirements` plugin.
+- Run `sls deploy` to deploy your function.
 
 ### Resources
-
 
 ### License
 
 GNU GENERAL PUBLIC LICENSE - Version 3, 29 June 2007
 
-
-
-
-[troposphere_link]: https://github.com/cloudtools/troposphere
-[cloudformation_link]: http://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/Welcome.html
-[guardduty_link]: https://aws.amazon.com/guardduty/
-[slack_webhook_link]: https://my.slack.com/services/new/incoming-webhook/
-[lambda_perms_link]: https://docs.aws.amazon.com/lambda/latest/dg/intro-permission-model.html
+Huge thanks to [GlorifiedTypist](https://github.com/GlorifiedTypist/lambda-guardduty-to-slack) who
+created the original script. Almost no modifications were made to the handler, and that it is
+completely thanks to them that this exists.

@@ -1,4 +1,1 @@
-requests==2.18.4
-virtualenv==15.1.0
-flake8==3.4.1
-awscli==1.14.40
+requests

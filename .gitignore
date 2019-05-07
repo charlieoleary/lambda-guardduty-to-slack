@@ -93,3 +93,5 @@ ENV/
 # Other
 lambda_bundle.zip
 .DS_Store
+node_modules
+.serverless

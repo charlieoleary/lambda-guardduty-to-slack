@@ -7,8 +7,8 @@ from base64 import b64decode
 from urllib.request import Request, urlopen
 from urllib.error import URLError, HTTPError
 
-SLACK_CHANNEL = os.environ['slackChannel']
-HOOK_URL = os.environ['kmsEncryptedHookUrl']
+SLACK_CHANNEL = os.environ['SLACK_CHANNEL']
+HOOK_URL = os.environ['SLACK_WEBHOOK']
 AWS_DOC_URL = "https://docs.aws.amazon.com/console/guardduty/"
 AWS_CON_URL = "https://console.aws.amazon.com/guardduty"
 
@@ -20,23 +20,23 @@ def send_to_slack(severity, title, alert_type, msg_id, region):
 
     link_title = ''.join(e for e in alert_type if e.isalnum())
     link_url = "%s%s" % (AWS_DOC_URL, link_title)
-    link_url_console = "%s/home?region=%s#/findings?search=id=%s" % (AWS_CON_URL, region, msg_id)
+    link_url_console = "%s/home?region=%s#/findings?search=id=%s" % (
+        AWS_CON_URL, region, msg_id)
 
     sev_high = ['danger', 'High']
     sev_medium = ['warning', 'Medium']
     sev_low = ['#ff970f', 'Low']
 
-    sinfo = ( (0.1<=severity<3.9) and sev_low ) or \
-            ( (4.0<=severity<6.9) and sev_medium ) or \
-            ( (7.0<=severity<8.9) and sev_high )
+    sinfo = ((0.1 <= severity < 3.9) and sev_low) or \
+            ((4.0 <= severity < 6.9) and sev_medium) or \
+            ((7.0 <= severity < 8.9) and sev_high)
 
     color = str(sinfo[0])
     score = str(sinfo[1])
 
     slack_message = {
         "channel": SLACK_CHANNEL,
-        "username": "GuardDuty",
-        "icon_emoji": ":warning:",
+        "username": "Commander Mo (AWS GuardDuty)",
         "attachments": [{
             "color": color,
             "text": title,
@@ -76,7 +76,7 @@ def send_to_slack(severity, title, alert_type, msg_id, region):
         logger.error("Server connection failed: %s", e.reason)
 
 
-def lambda_handler(event, context):
+def handler(event, context):
 
     timestamp = event['time']
     title = event['detail']['title']
@@ -88,4 +88,3 @@ def lambda_handler(event, context):
     send_to_slack(severity, title, alert_type, msg_id, region)
 
     return str(event)
-

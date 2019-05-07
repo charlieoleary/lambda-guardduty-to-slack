@@ -1,0 +1,26 @@
+service: guardDutyNotifications
+provider:
+  name: aws
+  stage: prod
+  runtime: python3.7
+  region: us-west-2
+  versionFunctions: false
+  environment:
+    # this variable should be an encrypted SSM parameter with the webhook you will be posting to.
+    SLACK_WEBHOOK: ${ssm:/serverless/guardDutyNotifications/SLACK_WEBHOOK~true}
+    # this variable should be an SSM string parameter with the channel you will be posting to.
+    SLACK_CHANNEL: ${ssm:/serverless/guardDutyNotifications/SLACK_CHANNEL}
+
+functions:
+  sendMessage:
+    handler: sendMessage.handler
+    events:
+      - cloudwatchEvent:
+        event:
+          source:
+            - "aws.guardduty"
+          detail-type:
+            - "GuardDuty Finding"
+
+plugins:
+  - serverless-python-requirements
